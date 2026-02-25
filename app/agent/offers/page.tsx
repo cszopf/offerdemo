@@ -28,7 +28,7 @@ export default function AgentDashboard() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'grid'>('list');
   const [summaries, setSummaries] = useState<Record<string, { text: string; loading: boolean }>>({});
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [selectedSummary, setSelectedSummary] = useState<{ id: string; text: string } | null>(null);
 
   // Mock data
   const [offers, setOffers] = useState<any[]>([
@@ -72,20 +72,8 @@ export default function AgentDashboard() {
   }, []);
 
   const summarizeOffer = async (offer: any) => {
-    const isExpanded = expandedIds.has(offer.id);
-    
-    if (isExpanded) {
-      const newExpanded = new Set(expandedIds);
-      newExpanded.delete(offer.id);
-      setExpandedIds(newExpanded);
-      return;
-    }
-
-    const newExpanded = new Set(expandedIds);
-    newExpanded.add(offer.id);
-    setExpandedIds(newExpanded);
-
     if (summaries[offer.id]?.text) {
+      setSelectedSummary({ id: offer.id, text: summaries[offer.id].text });
       return;
     }
 
@@ -105,6 +93,7 @@ export default function AgentDashboard() {
       `.trim();
 
       setSummaries(prev => ({ ...prev, [offer.id]: { text: summary, loading: false } }));
+      setSelectedSummary({ id: offer.id, text: summary });
     }, 800);
   };
 
@@ -236,105 +225,61 @@ export default function AgentDashboard() {
             </thead>
             <tbody>
               {offers.map((offer) => (
-                <React.Fragment key={offer.id}>
-                  <tr className={`border-b border-black/5 hover:bg-[#F5F5F5]/50 transition-colors group ${expandedIds.has(offer.id) ? 'bg-amber-50/30' : ''}`}>
-                    <td className="px-8 py-6">
-                      <div className="text-sm font-medium mb-1">{offer.buyer}</div>
-                      <div className="text-[10px] text-black/40 uppercase tracking-widest">{offer.agent}</div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="text-sm font-medium">${offer.price.toLocaleString()}</div>
-                      <div className="text-[10px] text-black/40 uppercase tracking-widest">Feb 25, 2026</div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="text-[10px] uppercase tracking-widest text-black/60 mb-1">{offer.financing}</div>
-                      <div className="text-[10px] text-black/40 uppercase tracking-widest">{offer.contingencies} Contingencies</div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-full border-2 border-black/5 flex items-center justify-center text-xs font-serif">
-                          {offer.score}
-                        </div>
-                        <div className="flex gap-0.5">
-                          {[1, 2, 3, 4, 5].map((s) => (
-                            <Star key={s} className={`w-2.5 h-2.5 ${s <= Math.round(offer.score / 2) ? 'text-amber-400 fill-current' : 'text-black/10'}`} />
-                          ))}
-                        </div>
+                <tr key={offer.id} className="border-b border-black/5 hover:bg-[#F5F5F5]/50 transition-colors group">
+                  <td className="px-8 py-6">
+                    <div className="text-sm font-medium mb-1">{offer.buyer}</div>
+                    <div className="text-[10px] text-black/40 uppercase tracking-widest">{offer.agent}</div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="text-sm font-medium">${offer.price.toLocaleString()}</div>
+                    <div className="text-[10px] text-black/40 uppercase tracking-widest">Feb 25, 2026</div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="text-[10px] uppercase tracking-widest text-black/60 mb-1">{offer.financing}</div>
+                    <div className="text-[10px] text-black/40 uppercase tracking-widest">{offer.contingencies} Contingencies</div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full border-2 border-black/5 flex items-center justify-center text-xs font-serif">
+                        {offer.score}
                       </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <span className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-medium ${getStatusColor(offer.status)}`}>
-                        {offer.status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex items-center justify-end gap-4">
-                        <button 
-                          onClick={() => summarizeOffer(offer)}
-                          disabled={summaries[offer.id]?.loading}
-                          className={`p-2 transition-colors ${summaries[offer.id]?.loading ? 'text-amber-500 animate-pulse' : (expandedIds.has(offer.id) ? 'text-amber-600' : 'text-black/20 hover:text-amber-500')}`}
-                          title="AI Summarize"
-                        >
-                          {summaries[offer.id]?.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                        </button>
-                        <button className="p-2 text-black/20 hover:text-black transition-colors">
-                          <MessageSquare className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => window.location.href = `/offer/status/${offer.id}`}
-                          className="p-2 text-black/20 hover:text-black transition-colors"
-                        >
-                          <ArrowUpRight className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 text-black/20 hover:text-black transition-colors">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star key={s} className={`w-2.5 h-2.5 ${s <= Math.round(offer.score / 2) ? 'text-amber-400 fill-current' : 'text-black/10'}`} />
+                        ))}
                       </div>
-                    </td>
-                  </tr>
-                  <AnimatePresence>
-                    {expandedIds.has(offer.id) && (
-                      <motion.tr 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="bg-amber-50/30 border-b border-black/5 overflow-hidden"
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-medium ${getStatusColor(offer.status)}`}>
+                      {offer.status.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6 text-right">
+                    <div className="flex items-center justify-end gap-4">
+                      <button 
+                        onClick={() => summarizeOffer(offer)}
+                        disabled={summaries[offer.id]?.loading}
+                        className={`p-2 transition-colors ${summaries[offer.id]?.loading ? 'text-amber-500 animate-pulse' : 'text-black/20 hover:text-amber-500'}`}
+                        title="AI Summarize"
                       >
-                        <td colSpan={6} className="px-8 py-6">
-                          <div className="flex justify-between items-start gap-8">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-4">
-                                <Sparkles className="w-3 h-3 text-amber-600" />
-                                <span className="text-[10px] uppercase tracking-widest font-medium text-amber-900">AI Strategic Analysis</span>
-                              </div>
-                              {summaries[offer.id]?.loading ? (
-                                <div className="flex items-center gap-3 text-black/40">
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                  <span className="text-xs font-light italic">Synthesizing offer terms...</span>
-                                </div>
-                              ) : (
-                                <div className="text-sm font-light leading-relaxed text-black/70 whitespace-pre-wrap max-w-3xl">
-                                  {summaries[offer.id]?.text}
-                                </div>
-                              )}
-                            </div>
-                            <button 
-                              onClick={() => {
-                                const newExpanded = new Set(expandedIds);
-                                newExpanded.delete(offer.id);
-                                setExpandedIds(newExpanded);
-                              }}
-                              className="p-2 text-black/20 hover:text-black transition-colors"
-                              title="Close Analysis"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    )}
-                  </AnimatePresence>
-                </React.Fragment>
+                        {summaries[offer.id]?.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      </button>
+                      <button className="p-2 text-black/20 hover:text-black transition-colors">
+                        <MessageSquare className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => window.location.href = `/offer/status/${offer.id}`}
+                        className="p-2 text-black/20 hover:text-black transition-colors"
+                      >
+                        <ArrowUpRight className="w-4 h-4" />
+                      </button>
+                      <button className="p-2 text-black/20 hover:text-black transition-colors">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -353,6 +298,57 @@ export default function AgentDashboard() {
           </div>
         </div>
       </main>
+
+      {/* AI Summary Modal */}
+      <AnimatePresence>
+        {selectedSummary && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedSummary(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white max-w-lg w-full p-10 shadow-2xl border border-black/5"
+            >
+              <div className="flex justify-between items-start mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-50 rounded-lg">
+                    <Sparkles className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-serif">AI Offer Analysis</h3>
+                    <p className="text-[10px] uppercase tracking-widest text-black/40">Offer ID: {selectedSummary.id}</p>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedSummary(null)} className="text-black/20 hover:text-black transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="prose prose-sm max-w-none">
+                <div className="text-black/70 font-light leading-relaxed whitespace-pre-wrap text-sm">
+                  {selectedSummary.text}
+                </div>
+              </div>
+
+              <div className="mt-10 pt-6 border-t border-black/5 flex justify-end">
+                <button 
+                  onClick={() => setSelectedSummary(null)}
+                  className="px-8 py-3 bg-black text-white text-[10px] uppercase tracking-widest hover:bg-zinc-800 transition-all"
+                >
+                  Close Analysis
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
