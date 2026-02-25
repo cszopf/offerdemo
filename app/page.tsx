@@ -62,6 +62,8 @@ const SectionHeading = ({ children, subtitle, light = false }: { children: React
   </div>
 );
 
+import LocalDestinations from '@/components/LocalDestinations';
+
 // --- Page Sections ---
 
 export default function LandingPage() {
@@ -336,6 +338,9 @@ export default function LandingPage() {
           </Button>
         </div>
       </section>
+
+      {/* 6.5 Local Destinations Section */}
+      <LocalDestinations />
 
       {/* 7. Advisor Section */}
       <section className="py-32 bg-[#F5F5F5] px-8 md:px-16 lg:px-32 border-t border-black/5">

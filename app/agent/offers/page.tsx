@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { GoogleGenAI } from "@google/genai";
 import { 
   Search, 
   Filter, 
@@ -15,12 +16,19 @@ import {
   List,
   TrendingUp,
   ShieldCheck,
-  Download
+  Download,
+  Sparkles,
+  Loader2,
+  X
 } from 'lucide-react';
+
+const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY as string });
 
 export default function AgentDashboard() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'grid'>('list');
+  const [summaries, setSummaries] = useState<Record<string, { text: string; loading: boolean }>>({});
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // Mock data
   const [offers, setOffers] = useState<any[]>([
@@ -62,6 +70,43 @@ export default function AgentDashboard() {
   useEffect(() => {
     setTimeout(() => setLoading(false), 1000);
   }, []);
+
+  const summarizeOffer = async (offer: any) => {
+    const isExpanded = expandedIds.has(offer.id);
+    
+    if (isExpanded) {
+      const newExpanded = new Set(expandedIds);
+      newExpanded.delete(offer.id);
+      setExpandedIds(newExpanded);
+      return;
+    }
+
+    const newExpanded = new Set(expandedIds);
+    newExpanded.add(offer.id);
+    setExpandedIds(newExpanded);
+
+    if (summaries[offer.id]?.text) {
+      return;
+    }
+
+    setSummaries(prev => ({ ...prev, [offer.id]: { text: '', loading: true } }));
+    
+    // Mock AI Analysis for speed
+    setTimeout(() => {
+      const isCash = offer.financing.toLowerCase().includes('cash');
+      const isHighPrice = offer.price >= 9200000;
+      const lowContingencies = offer.contingencies <= 1;
+
+      const summary = `
+• STRENGTHS: ${isHighPrice ? 'Exceptionally strong price point above list.' : 'Solid competitive offer.'} ${isCash ? 'Cash financing significantly reduces closing risk.' : 'Standard financing terms.'}
+• WEAKNESSES: ${offer.contingencies > 3 ? 'High number of contingencies may delay closing.' : 'Relatively clean offer with standard protections.'}
+• RISKS: ${!isCash && offer.contingencies > 0 ? 'Appraisal or financing gaps could emerge during the 45-day window.' : 'Minimal risk due to strong financial position.'}
+• RECOMMENDATION: ${offer.score >= 9 ? 'Highly recommended for immediate acceptance.' : 'Strong contender; consider for backup or counter-offer.'}
+      `.trim();
+
+      setSummaries(prev => ({ ...prev, [offer.id]: { text: summary, loading: false } }));
+    }, 800);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -191,53 +236,105 @@ export default function AgentDashboard() {
             </thead>
             <tbody>
               {offers.map((offer) => (
-                <tr key={offer.id} className="border-b border-black/5 hover:bg-[#F5F5F5]/50 transition-colors group">
-                  <td className="px-8 py-6">
-                    <div className="text-sm font-medium mb-1">{offer.buyer}</div>
-                    <div className="text-[10px] text-black/40 uppercase tracking-widest">{offer.agent}</div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="text-sm font-medium">${offer.price.toLocaleString()}</div>
-                    <div className="text-[10px] text-black/40 uppercase tracking-widest">Feb 25, 2026</div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="text-[10px] uppercase tracking-widest text-black/60 mb-1">{offer.financing}</div>
-                    <div className="text-[10px] text-black/40 uppercase tracking-widest">{offer.contingencies} Contingencies</div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-full border-2 border-black/5 flex items-center justify-center text-xs font-serif">
-                        {offer.score}
+                <React.Fragment key={offer.id}>
+                  <tr className={`border-b border-black/5 hover:bg-[#F5F5F5]/50 transition-colors group ${expandedIds.has(offer.id) ? 'bg-amber-50/30' : ''}`}>
+                    <td className="px-8 py-6">
+                      <div className="text-sm font-medium mb-1">{offer.buyer}</div>
+                      <div className="text-[10px] text-black/40 uppercase tracking-widest">{offer.agent}</div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="text-sm font-medium">${offer.price.toLocaleString()}</div>
+                      <div className="text-[10px] text-black/40 uppercase tracking-widest">Feb 25, 2026</div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="text-[10px] uppercase tracking-widest text-black/60 mb-1">{offer.financing}</div>
+                      <div className="text-[10px] text-black/40 uppercase tracking-widest">{offer.contingencies} Contingencies</div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-2">
+                        <div className="w-10 h-10 rounded-full border-2 border-black/5 flex items-center justify-center text-xs font-serif">
+                          {offer.score}
+                        </div>
+                        <div className="flex gap-0.5">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star key={s} className={`w-2.5 h-2.5 ${s <= Math.round(offer.score / 2) ? 'text-amber-400 fill-current' : 'text-black/10'}`} />
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex gap-0.5">
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <Star key={s} className={`w-2.5 h-2.5 ${s <= Math.round(offer.score / 2) ? 'text-amber-400 fill-current' : 'text-black/10'}`} />
-                        ))}
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-medium ${getStatusColor(offer.status)}`}>
+                        {offer.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <div className="flex items-center justify-end gap-4">
+                        <button 
+                          onClick={() => summarizeOffer(offer)}
+                          disabled={summaries[offer.id]?.loading}
+                          className={`p-2 transition-colors ${summaries[offer.id]?.loading ? 'text-amber-500 animate-pulse' : (expandedIds.has(offer.id) ? 'text-amber-600' : 'text-black/20 hover:text-amber-500')}`}
+                          title="AI Summarize"
+                        >
+                          {summaries[offer.id]?.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        </button>
+                        <button className="p-2 text-black/20 hover:text-black transition-colors">
+                          <MessageSquare className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => window.location.href = `/offer/status/${offer.id}`}
+                          className="p-2 text-black/20 hover:text-black transition-colors"
+                        >
+                          <ArrowUpRight className="w-4 h-4" />
+                        </button>
+                        <button className="p-2 text-black/20 hover:text-black transition-colors">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-medium ${getStatusColor(offer.status)}`}>
-                      {offer.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    <div className="flex items-center justify-end gap-4">
-                      <button className="p-2 text-black/20 hover:text-black transition-colors">
-                        <MessageSquare className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => window.location.href = `/offer/status/${offer.id}`}
-                        className="p-2 text-black/20 hover:text-black transition-colors"
+                    </td>
+                  </tr>
+                  <AnimatePresence>
+                    {expandedIds.has(offer.id) && (
+                      <motion.tr 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-amber-50/30 border-b border-black/5 overflow-hidden"
                       >
-                        <ArrowUpRight className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 text-black/20 hover:text-black transition-colors">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                        <td colSpan={6} className="px-8 py-6">
+                          <div className="flex justify-between items-start gap-8">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-4">
+                                <Sparkles className="w-3 h-3 text-amber-600" />
+                                <span className="text-[10px] uppercase tracking-widest font-medium text-amber-900">AI Strategic Analysis</span>
+                              </div>
+                              {summaries[offer.id]?.loading ? (
+                                <div className="flex items-center gap-3 text-black/40">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span className="text-xs font-light italic">Synthesizing offer terms...</span>
+                                </div>
+                              ) : (
+                                <div className="text-sm font-light leading-relaxed text-black/70 whitespace-pre-wrap max-w-3xl">
+                                  {summaries[offer.id]?.text}
+                                </div>
+                              )}
+                            </div>
+                            <button 
+                              onClick={() => {
+                                const newExpanded = new Set(expandedIds);
+                                newExpanded.delete(offer.id);
+                                setExpandedIds(newExpanded);
+                              }}
+                              className="p-2 text-black/20 hover:text-black transition-colors"
+                              title="Close Analysis"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    )}
+                  </AnimatePresence>
+                </React.Fragment>
               ))}
             </tbody>
           </table>
